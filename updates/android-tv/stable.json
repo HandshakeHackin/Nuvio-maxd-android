@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "platform": "android-tv",
+  "applicationId": "io.github.handshakehackin.nuviomaxd.androidtv",
+  "channel": "stable",
+  "latest": null
+}

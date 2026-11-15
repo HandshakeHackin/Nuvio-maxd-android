@@ -1,0 +1,5 @@
+* text=auto
+gradlew text eol=lf
+*.bat text eol=crlf
+shared/native-app/third_party/** -whitespace
+app/src/main/assets/core/provider-runtime.js -whitespace
