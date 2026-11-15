@@ -1,0 +1,14 @@
+Nuvio Max'd — Android TV
+Project license: GNU General Public License, version 3 (see GPL-3.0.txt).
+
+AndroidX Core and AndroidX Media3
+Copyright The Android Open Source Project.
+Licensed under the Apache License, Version 2.0 (see Apache-2.0.txt).
+
+Kotlin standard library
+Copyright JetBrains s.r.o. and respective authors and developers.
+Licensed under the Apache License, Version 2.0 (see Apache-2.0.txt).
+
+Max'd logo copied unchanged from HandshakeHackin/Nuvio-maxd-releases.
+Branding credits: NuvioMedia/NuvioTVSmart and the original Max'd project.
+Nuvio Max'd is an unofficial client.

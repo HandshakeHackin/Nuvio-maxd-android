@@ -1,0 +1,35 @@
+<resources>
+    <string name="app_name">Nuvio Max\'d</string>
+    <string name="tv_title">Nuvio Max\'d · Android TV</string>
+    <string name="preview_description">Android TV preview · Remote and D-pad navigation</string>
+    <string name="play_stream">Play a stream</string>
+    <string name="app_updates">App updates</string>
+    <string name="about">About this preview</string>
+    <string name="about_body">This first Android TV preview plays HTTPS video links and includes a separate Android update channel. Nuvio sign-in, profiles, addon browsing and library sync are still being ported.\n\nThe PS5 edition has its own repository and releases.\n\nGPL-3.0 · Unofficial client. Not affiliated with Nuvio, Stremio, Sony or Google.</string>
+    <string name="stream_title">Play an HTTPS video link</string>
+    <string name="stream_hint">https://…</string>
+    <string name="stream_help">Use a direct video, HLS or DASH link. Available formats depend on your TV.</string>
+    <string name="play">Play</string>
+    <string name="cancel">Cancel</string>
+    <string name="invalid_stream">Enter a valid HTTPS video link without a username or password in the address.</string>
+    <string name="playback_error">This stream could not be played. Check the link, network and supported formats.</string>
+    <string name="version_label">Android TV %1$s · Build %2$d</string>
+    <string name="updates_description">Android TV stable channel. PS5 releases are separate.</string>
+    <string name="update_initial">Check for a newer Android TV release.</string>
+    <string name="debug_updates">This is a development APK. Install an official signed Android TV release to receive stable upgrades.</string>
+    <string name="check_updates">Check for updates</string>
+    <string name="checking_updates">Checking Android TV updates…</string>
+    <string name="no_release">No Android TV release has been published yet.</string>
+    <string name="up_to_date">You have the latest Android TV version.</string>
+    <string name="android_required">A newer release is available, but it requires Android API %1$d or later.</string>
+    <string name="update_available">Android TV %1$s is available.\n\n%2$s</string>
+    <string name="download_update">Download update</string>
+    <string name="downloading_update">Downloading and verifying update… %1$d%%</string>
+    <string name="update_ready">The update is verified and ready. Android will ask you to confirm installation.</string>
+    <string name="install_update">Install update</string>
+    <string name="allow_updates">Allow app installs</string>
+    <string name="allow_updates_help">Allow installs from Nuvio Max\'d in Android Settings, then return and select Install update.</string>
+    <string name="installer_error">Android could not open the installer or install-permission screen.</string>
+    <string name="update_error">The update could not be completed. Check your connection and try again.</string>
+    <string name="back">Back</string>
+</resources>
