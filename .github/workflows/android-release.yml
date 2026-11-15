@@ -29,7 +29,15 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .native-deps/downloads
+            .native-deps/sources
+            .native-deps/prefix
+          key: android-native-${{ runner.os }}-${{ hashFiles('native-dependencies.json', 'tools/native_dependencies.py') }}
+      - run: python3 tools/native_dependencies.py
       - name: Load the Android signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

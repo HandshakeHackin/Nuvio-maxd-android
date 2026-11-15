@@ -1,0 +1,7 @@
+Nuvio Max'd Android TV 0.2.0 development
+
+The Android TV app now incorporates the portable PS5 service core: Nuvio pairing/profiles, addon and JavaScript provider protocols, catalogs/streams, library and progress synchronization, tracking accounts, debrid services, Live TV/EPG, IPTV catalogs, media servers and the torrent/Web Drop engine.
+
+Playback and controls use Android Media3 / VLC and Android display/audio APIs. Android APKs, version codes and update feeds remain independent of PS5 releases.
+
+This development build requires Android TV hardware testing. Service availability, addon/provider compatibility, codec/HDR/audio support and native APIs remain device-dependent. Consult the feature parity and testing documents for the current verified coverage.

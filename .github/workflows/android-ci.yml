@@ -19,7 +19,25 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .native-deps/downloads
+            .native-deps/sources
+            .native-deps/prefix
+          key: android-native-${{ runner.os }}-${{ hashFiles('native-dependencies.json', 'tools/native_dependencies.py') }}
+      - name: Build pinned native dependencies
+        run: python3 tools/native_dependencies.py
+      - name: Install host regression prerequisites
+        run: sudo apt-get update && sudo apt-get install -y g++ pkg-config libssl-dev libcurl4-openssl-dev libexpat1-dev zlib1g-dev
+      - name: Check shared services and Android dispatcher
+        run: |
+          python3 tools/test_shared_core.py
+          "$ANDROID_HOME/cmake/3.22.1/bin/cmake" -S app/src/main/cpp -B build/host-core -G Ninja \
+            -DCMAKE_MAKE_PROGRAM="$ANDROID_HOME/cmake/3.22.1/bin/ninja" -DCMAKE_BUILD_TYPE=Release
+          "$ANDROID_HOME/cmake/3.22.1/bin/cmake" --build build/host-core --parallel 2
+          python3 tools/test_android_bridge.py
       - run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
       - uses: actions/upload-artifact@v4
         with:
@@ -32,3 +50,4 @@ jobs:
           path: |
             app/build/reports/tests/
             app/build/reports/lint-results-debug.html
+            build/shared-tests/

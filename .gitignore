@@ -18,3 +18,5 @@ keystore.properties
 .DS_Store
 dist/
 __pycache__/
+.native-deps/
+**/test-output/
