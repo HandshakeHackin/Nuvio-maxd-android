@@ -10,7 +10,7 @@ class MainActivity : TvActivity() {
     override fun onResume(){super.onResume();if(ready)render()}
     override fun render(){
         screen("Nuvio Max'd · Android TV",false)
-        text("${BuildConfig.VERSION_NAME} · ${if(CoreBridge.signedIn)"Nuvio account" else "Guest profile"}")
+        text("${BuildConfig.VERSION_NAME} · ${if(CoreBridge.context.optBoolean("pending"))"Account verification pending" else if(CoreBridge.signedIn)"Nuvio account" else "Guest profile"}")
         button("Browse catalogs"){go(BrowserActivity::class.java)}
         button("Search movies & series"){form("Search",listOf("Title" to false)){values->go(BrowserActivity::class.java,JSONObject().put("screen","search").put("query",values[0]))}}
         button("Library & Continue Watching"){go(BrowserActivity::class.java,JSONObject().put("screen","library"))}

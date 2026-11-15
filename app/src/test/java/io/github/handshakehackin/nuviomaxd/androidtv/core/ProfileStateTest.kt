@@ -25,4 +25,11 @@ class ProfileStateTest{
         assertEquals(0,state.settings.length());state.accept(3,profile("b"),JSONObject().put("torrents",false))
         assertFalse(state.settings.getBoolean("torrents"))
     }
+    @Test fun verifiedStorageCannotBeReplacedByALateUnverifiedResponse(){
+        val state=ProfileState();val pending=profile("same-session").put("profilePath","/pending/login")
+        val verified=profile("same-session").put("profilePath","/profiles/account/1")
+        state.accept(1,pending,JSONObject().put("gain",225));state.accept(2,verified)
+        assertEquals(0,state.settings.length());assertFalse(state.accept(1,pending,JSONObject().put("gain",225)))
+        state.accept(3,verified,JSONObject().put("gain",150));assertEquals(150,state.settings.getInt("gain"))
+    }
 }

@@ -28,12 +28,23 @@ class TorrentsActivity:TvActivity(){
         screen("Torrent files")
         val original=payload.optJSONObject("playback")
         work("torrents.start",JSONObject().put("input",payload.optString("input")).put("sources",original?.optJSONObject("stream")?.optJSONArray("sources")).put("season",original?.optInt("season")?:0).put("episode",original?.optInt("episode")?:0)){value->val result=obj(value)
+            if(payload.optBoolean("auto")){
+                val files=result.optJSONArray("files")?.objects().orEmpty()
+                val requested=original?.optJSONObject("stream")?.optInt("file_idx",-1)?:-1
+                val selected=files.firstOrNull{it.optInt("index")==if(requested>=0)requested else result.optInt("suggested",-1)}
+                if(selected!=null){openFile(result,selected,original);finish();return@work}
+                text("Choose the video file to continue with this episode.")
+            }
             result.optJSONArray("files")?.objects()?.forEach{file->button("${file.optString("name")} · ${file.optLong("size")/1024/1024} MiB"){
-                val playback=original?.let{JSONObject(it.toString())}?:JSONObject().put("type","torrent").put("name",file.optString("name")).put("id","torrent:${result.optString("hash")}:${file.optInt("index")}")
-                playback.put("url","torrent://${result.optString("hash")}/${file.optInt("index")}").put("torrentHash",result.optString("hash")).put("torrentIndex",file.optInt("index"))
-                play(playback)
+                openFile(result,file,original)
             }}
         }
+    }
+    private fun openFile(result:JSONObject,file:JSONObject,original:JSONObject?){
+        val playback=original?.let{JSONObject(it.toString())}?:JSONObject().put("type","torrent").put("name",file.optString("name")).put("id","torrent:${result.optString("hash")}:${file.optInt("index")}")
+        playback.remove("deferredTorrent")
+        playback.put("url","torrent://${result.optString("hash")}/${file.optInt("index")}").put("torrentHash",result.optString("hash")).put("torrentIndex",file.optInt("index"))
+        play(playback)
     }
     @Deprecated("Android TV document picker callback")override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){
         super.onActivityResult(requestCode,resultCode,data)

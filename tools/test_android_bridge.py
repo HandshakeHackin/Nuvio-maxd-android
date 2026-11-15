@@ -153,6 +153,7 @@ def main():
                 request('settings.save',{'settings':{'torrents':True}})
                 torrent=request('torrents.start',{'input':server.origin+'/fixture.torrent'})
                 assert torrent['hash']==hashlib.sha1(bencode(info)).hexdigest()
+                request('test.torrent.read',{'hash':torrent['hash'],'index':0,'profileKey':'previous-profile'},False)
                 received=b''
                 while len(received)<4096:
                     read=request('test.torrent.read',{'hash':torrent['hash'],'index':0,'offset':32000+len(received),'length':4096-len(received)})
@@ -162,6 +163,7 @@ def main():
                 read=request('test.torrent.read',{'hash':torrent['hash'],'index':0,'offset':len(DATA)-17,'length':4096})
                 assert bytes.fromhex(read['hex'])==DATA[-17:]
                 request('settings.save',{'settings':{'torrents':False}})
+                request('test.torrent.read',{'hash':torrent['hash'],'index':0},False)
                 request('torrents.web.start',ok=False)
                 request('app.background');request('app.foreground')
             finally:

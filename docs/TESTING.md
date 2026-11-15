@@ -14,9 +14,10 @@ python3 tools/test_shared_core.py
   -DCMAKE_MAKE_PROGRAM="$ANDROID_HOME/cmake/3.22.1/bin/ninja" -DCMAKE_BUILD_TYPE=Release
 "$ANDROID_HOME/cmake/3.22.1/bin/cmake" --build build/host-core --parallel 2
 python3 tools/test_android_bridge.py
+python3 tools/test_android_account_boundary.py
 ```
 
-The service runner writes individual logs and `results.json` under `build/shared-tests/`. `--suites media_servers plex` reruns selected suites while preserving previous recorded results. CI always runs the full set. Host dispatcher builds disable public default torrent trackers, DHT and UPnP; the torrent fixture uses only its own localhost web seed and verifies bytes across piece boundaries and at EOF. This does not test a real swarm.
+The service runner writes individual logs and `results.json` under `build/shared-tests/`. `--suites media_servers plex` reruns selected suites while preserving previous recorded results. CI always runs the full set. Host dispatcher builds disable public default torrent trackers, DHT and UPnP; the torrent fixture uses only its own localhost web seed and verifies bytes across piece boundaries and at EOF. This does not test a real swarm. The account-boundary fixture pairs against a local HTTPS backend, revokes its refresh token and checks that account data cannot be returned or persisted as Guest; errors must publish the updated context and reject stale-profile requests.
 
 JVM tests cover updater rejection/validation, stale account/profile/settings responses, header origin isolation/injection, PCM identity/downmix/night mode, post-credit protection and paused/cancelled autoplay. Service suites cover live TV, XMLTV/EPG, IPTV cache/outages, episode/timing parsers, debrid clients, tracker contracts, media servers, Plex, prepared links, series updates, trailers, accounts/watch sync and JavaScript providers.
 

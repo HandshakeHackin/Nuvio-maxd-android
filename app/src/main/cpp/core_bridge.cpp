@@ -29,6 +29,7 @@ struct Failure : std::runtime_error { using std::runtime_error::runtime_error; }
 std::mutex requests;
 uint64_t response_sequence=0;
 std::atomic<bool> cancelled{false};
+std::atomic<uint64_t> profile_revision{0};
 std::string data_dir, assets_dir;
 std::vector<Addon> addons;
 std::string addon_profile;
@@ -44,14 +45,21 @@ plex::Pair plex_pair;
 std::vector<plex::Server> plex_servers;
 debrid::DeviceCode torbox_pair;
 json library_cache = json::array();
+std::string active_context,active_path,operation_context,operation_path;
+bool scoped_operation=false;
 
 void require(bool condition, const std::string& error) { if(!condition) throw Failure(error); }
 template<class Predicate> void erase_rows(json& rows, Predicate predicate) {
     rows.erase(std::remove_if(rows.begin(),rows.end(),predicate),rows.end());
 }
 json api(const ApiResult& value) { require(value.ok,value.error.empty()?"The service request failed.":value.error); return value.result; }
+std::string profile_storage() {
+    if(!nuvio_account_saved())return data_dir+"/guest";
+    if(nuvio_account_user_id().empty())return data_dir+"/pending/"+std::to_string(fnv1a(nuvio_profile_key()));
+    return nuvio_profile_path();
+}
 std::string profile_dir() {
-    auto path=nuvio_profile_path();
+    auto path=profile_storage();
     if(path.empty()) path=data_dir+"/guest";
     require(make_dirs(path),"Profile storage is unavailable.");
     return path;
@@ -65,9 +73,16 @@ json state() {
     if(!jobj(result,"providerPreferences").is_object()) result["providerPreferences"]=json::object();
     return result;
 }
-void persist(const json& value) { require(save_json(profile_dir()+"/android-state.json",value),"Could not save profile settings."); }
+void persist(const json& value) {
+    require(!scoped_operation||(operation_context==nuvio_profile_key()&&operation_path==profile_storage()),"The active account or profile changed. Reload this screen.");
+    require(save_json(profile_dir()+"/android-state.json",value),"Could not save profile settings.");
+}
 std::string identity(const std::string& text) { return std::to_string(fnv1a(text)); }
 void changed_profile() {
+    active_context=nuvio_profile_key();
+    active_path=profile_storage();
+    ++profile_revision;
+    plex_pair={};plex_servers.clear();torbox_pair={};
     addons.clear(); addon_profile.clear(); source_cache.clear(); channel_cache.clear(); channel_times.clear();
     series_updates.clear();
     library_cache=json::array(); providers::clear_script_cache(); bt::Engine::get().stop_web_drop();
@@ -77,7 +92,7 @@ void changed_profile() {
     bt::Engine::get().configure(profile_dir()+"/torrent-cache",int64_t(jnum(settings,"torrentCacheGiB",1))*1024*1024*1024);
     bt::Engine::get().set_enabled(jbool(settings,"torrents",false));
 }
-json context() { return {{"saved",nuvio_account_saved()},{"profileKey",nuvio_profile_key()},{"profilePath",profile_dir()}}; }
+json context() { return {{"saved",nuvio_account_saved()},{"pending",nuvio_account_saved()&&nuvio_account_user_id().empty()},{"profileKey",nuvio_profile_key()},{"profilePath",profile_dir()}}; }
 json public_source(const json& value) {
     return {{"id",jstr(value,"id")},{"name",jstr(value,"name")},{"type",jstr(value,"type")},{"guide",!jstr(value,"guideUrl").empty()}};
 }
@@ -647,27 +662,41 @@ json dispatch(const std::string& command,const json& args) {
 
 json call(const std::string& command,const json& arguments) {
     std::lock_guard<std::mutex> lock(requests);cancelled=false;
+    operation_context=nuvio_profile_key();operation_path=profile_storage();scoped_operation=command!="init";
+    const auto reconcile=[](){if(!data_dir.empty()&&(active_context!=nuvio_profile_key()||active_path!=profile_storage()))changed_profile();};
+    const auto failure=[&](const std::string& message){
+        json result{{"ok",false},{"error",message}};
+        try{reconcile();if(!data_dir.empty()){result["context"]=context();result["sequence"]=++response_sequence;}}catch(const std::exception&){}
+        return result;
+    };
     try {
         const auto value=dispatch(command,arguments.is_object()?arguments:json::object());
+        const bool changes_context=command=="init"||command=="account.poll"||command=="account.logout"||command=="profiles.select";
+        require(changes_context||(operation_context==nuvio_profile_key()&&operation_path==profile_storage()),"The active account or profile changed. Reload this screen.");
+        reconcile();
         return {{"ok",true},{"result",value},{"context",context()},{"sequence",++response_sequence}};
-    } catch(const Failure& error) {return {{"ok",false},{"error",error.what()}};}
-    catch(const std::exception&) {return {{"ok",false},{"error","The request could not be completed. Retry or refresh this screen."}};}
+    } catch(const Failure& error) {return failure(error.what());}
+    catch(const std::exception&) {return failure("The request could not be completed. Retry or refresh this screen.");}
 }
 void cancel() {cancelled=true;}
 void shutdown() {cancel();if(prepared)prepared->shutdown();bt::Engine::get().shutdown();}
 
 struct TorrentReader {
-    std::shared_ptr<bt::Torrent> torrent;int reader=-1,index=-1;int64_t size=0;std::atomic<bool> abort{false};
+    std::shared_ptr<bt::Torrent> torrent;int reader=-1,index=-1;int64_t size=0;uint64_t revision=0;std::atomic<bool> abort{false};
     ~TorrentReader(){abort=true;if(torrent)bt::Engine::get().close_reader(torrent,reader);}
 };
-std::shared_ptr<TorrentReader> open_torrent(const std::string& hash,int index) {
-    if(!bt::Engine::get().stats(hash).found){bt::Engine::get().start(hash,{});std::vector<bt::FileInfo> files;std::string error;if(!bt::Engine::get().wait_metadata(hash,files,nullptr,60,&error))throw std::runtime_error(error);}
-    auto value=std::make_shared<TorrentReader>();value->index=index;std::string error;
+std::shared_ptr<TorrentReader> open_torrent(const std::string& hash,int index,const std::string& profile_key) {
+    std::lock_guard<std::mutex> lock(requests);cancelled=false;
+    require(profile_key==nuvio_profile_key(),"The active profile changed.");
+    require(jbool(jobj(state(),"settings"),"torrents"),"Peer-to-peer torrents are disabled.");
+    if(!bt::Engine::get().stats(hash).found){bt::Engine::get().start(hash,{});std::vector<bt::FileInfo> files;std::string error;if(!bt::Engine::get().wait_metadata(hash,files,&cancelled,60,&error))throw std::runtime_error(error);}
+    auto value=std::make_shared<TorrentReader>();value->index=index;value->revision=profile_revision.load();std::string error;
     value->torrent=bt::Engine::get().open_reader(hash,index,&value->reader,&value->size,&error);
     if(!value->torrent)throw std::runtime_error(error);return value;
 }
 int64_t torrent_size(const std::shared_ptr<TorrentReader>& reader) {return reader->size;}
 int read_torrent(const std::shared_ptr<TorrentReader>& reader,int64_t offset,uint8_t* data,int length) {
+    if(reader->revision!=profile_revision.load())return -1;
     bt::Engine::get().seek_reader(reader->torrent,reader->reader,reader->index,offset);
     return bt::Engine::get().read(reader->torrent,reader->reader,reader->index,offset,data,length,&reader->abort);
 }

@@ -31,9 +31,9 @@ Java_io_github_handshakehackin_nuviomaxd_androidtv_core_CoreBridge_nativeCall(JN
 extern "C" JNIEXPORT void JNICALL
 Java_io_github_handshakehackin_nuviomaxd_androidtv_core_CoreBridge_nativeCancel(JNIEnv*,jobject) {nuvio_android::cancel();}
 extern "C" JNIEXPORT jlongArray JNICALL
-Java_io_github_handshakehackin_nuviomaxd_androidtv_core_CoreBridge_nativeOpenTorrent(JNIEnv* env,jobject,jstring hash,jint index) {
+Java_io_github_handshakehackin_nuviomaxd_androidtv_core_CoreBridge_nativeOpenTorrent(JNIEnv* env,jobject,jstring hash,jint index,jstring profile_key) {
     try {
-        auto value=nuvio_android::open_torrent(string_value(env,hash),index);const auto id=next_reader++;
+        auto value=nuvio_android::open_torrent(string_value(env,hash),index,string_value(env,profile_key));const auto id=next_reader++;
         const jlong values[]={id,nuvio_android::torrent_size(value)};
         {std::lock_guard<std::mutex> lock(readers_mutex);readers[id]=std::move(value);}
         auto output=env->NewLongArray(2);if(output)env->SetLongArrayRegion(output,0,2,values);return output;
@@ -57,5 +57,6 @@ Java_io_github_handshakehackin_nuviomaxd_androidtv_core_CoreBridge_nativeCloseTo
 }
 extern "C" JNIEXPORT void JNICALL
 Java_io_github_handshakehackin_nuviomaxd_androidtv_core_CoreBridge_nativeCancelTorrentReads(JNIEnv*,jobject) {
+    nuvio_android::cancel();
     std::lock_guard<std::mutex> lock(readers_mutex);for(const auto& [id,value]:readers)nuvio_android::cancel_torrent(value);
 }

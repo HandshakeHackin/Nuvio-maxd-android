@@ -121,6 +121,7 @@ abstract class TvActivity : Activity() {
     protected fun obj(value: Any?)=value as? JSONObject?:JSONObject()
     protected fun arr(value: Any?)=value as? JSONArray?:JSONArray()
     protected fun pair(title:String,url:String,code:String,interval:Int=5,expires:Int=600,command:String,args:JSONObject=JSONObject(),cancelCommand:String?=null,done:(JSONObject)->Unit){
+        val pollingArgs=JSONObject(args.toString()).put("profileKey",CoreBridge.profileKey)
         val layout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(24),dp(8),dp(24),dp(8))}
         val label=TextView(this).apply{text="$url\n\n$code";textSize=20f;setTextIsSelectable(true)};layout.addView(label)
         runCatching{
@@ -136,7 +137,7 @@ abstract class TvActivity : Activity() {
             if(!active||!alive(token))return@Runnable
             if(android.os.SystemClock.elapsedRealtime()>=deadline){label.text="Code expired. Close this screen and request a new code.";return@Runnable}
             CoreBridge.workers.submit{
-                try{val result=CoreBridge.objectResult(command,args);main.post{
+                try{val result=CoreBridge.objectResult(command,pollingArgs);main.post{
                     if(active&&alive(token)){
                         if(result.optBoolean("pending"))main.postDelayed(tick,interval.coerceIn(2,60)*1000L)
                         else{active=false;dialog.dismiss();done(result)}
@@ -144,7 +145,7 @@ abstract class TvActivity : Activity() {
                 }}catch(error:Exception){main.post{if(active&&alive(token))label.text=if(error is CoreException)error.message else "Pairing failed. Please try again."}}
             }
         }
-        dialog.setOnDismissListener{active=false;main.removeCallbacks(tick);if(cancelCommand!=null)CoreBridge.workers.submit{runCatching{CoreBridge.request(cancelCommand)}}}
+        dialog.setOnDismissListener{active=false;main.removeCallbacks(tick);if(cancelCommand!=null)CoreBridge.workers.submit{runCatching{CoreBridge.request(cancelCommand,JSONObject().put("profileKey",pollingArgs.optString("profileKey")))}}}
         dialog.show();main.postDelayed(tick,interval.coerceIn(2,60)*1000L)
     }
     override fun onDestroy(){generation++;jobs.forEach{it.cancel(true)};super.onDestroy()}

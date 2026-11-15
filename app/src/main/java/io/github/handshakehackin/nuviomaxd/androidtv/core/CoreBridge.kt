@@ -57,12 +57,14 @@ object CoreBridge {
         val payload = JSONObject(arguments.toString())
         if (scoped && !payload.has("profileKey")) payload.put("profileKey", profileKey)
         val envelope = JSONObject(nativeCall(command, payload.toString().toByteArray(Charsets.UTF_8)).toString(Charsets.UTF_8))
-        if (!envelope.optBoolean("ok")) throw CoreException(envelope.optString("error", "The request failed."))
         val result = envelope.opt("result").takeUnless { it == JSONObject.NULL }
         envelope.optJSONObject("context")?.let { current ->
+            val changed=current.optString("profileKey")!=profileKey||current.optString("profilePath")!=context.optString("profilePath")
             val settingsResult=if(command=="settings"||command=="settings.save")result as? JSONObject else null
             if(!state.accept(envelope.optLong("sequence"),current,settingsResult))throw CoreException("The active profile changed. Reload this screen.")
+            if(changed&&command!="init"&&command!="settings"&&command!="settings.save")runCatching{refreshSettings()}
         }
+        if (!envelope.optBoolean("ok")) throw CoreException(envelope.optString("error", "The request failed."))
         return result
     }
 
@@ -74,7 +76,7 @@ object CoreBridge {
 
     private external fun nativeCall(command: String, arguments: ByteArray): ByteArray
     private external fun nativeCancel()
-    external fun nativeOpenTorrent(hash: String, index: Int): LongArray
+    external fun nativeOpenTorrent(hash: String, index: Int, profileKey: String): LongArray
     external fun nativeReadTorrent(handle: Long, position: Long, length: Int): ByteArray
     external fun nativeCloseTorrent(handle: Long)
     external fun nativeCancelTorrentReads()

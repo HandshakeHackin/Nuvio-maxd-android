@@ -12,7 +12,7 @@ Development APKs are available as artifacts of successful [Android TV checks](ht
 
 ## Build and test
 
-On Linux, install JDK 17, Python 3.12+, Perl, Make and the Android SDK with `platforms;android-35`, `build-tools;35.0.0`, `ndk;27.2.12479018` and `cmake;3.22.1`. Set `ANDROID_HOME` to the SDK directory. The dependency helper downloads checksum-pinned sources and cross-compiles static OpenSSL/curl for each ABI. The first build takes longer; `.native-deps` is a local cache.
+On Linux x86-64, install JDK 17, Python 3.12+, Perl, Make and the Android SDK with `platforms;android-35`, `build-tools;35.0.0`, `ndk;27.2.12479018` and `cmake;3.22.1`. Set `ANDROID_HOME` to the SDK directory. The dependency helper downloads checksum-pinned sources and cross-compiles static OpenSSL/curl for each ABI. The first build takes longer; `.native-deps` is a local cache.
 
 ```sh
 python3 tools/native_dependencies.py

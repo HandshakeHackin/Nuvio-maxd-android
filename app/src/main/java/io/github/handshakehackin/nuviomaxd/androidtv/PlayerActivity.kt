@@ -42,6 +42,7 @@ class PlayerActivity:Activity(){
     private lateinit var skip:Button
     private lateinit var next:Button
     private lateinit var cancelNext:Button
+    private lateinit var playControl:Button
     private var item=JSONObject()
     private var settings=JSONObject()
     private var exo:ExoPlayer?=null
@@ -64,6 +65,7 @@ class PlayerActivity:Activity(){
     private var nextItem:JSONObject?=null
     private var nextPreparedAt=-60_001L
     private var completionSent=false
+    private var transitioning=false
     private var externalSubtitle:JSONObject?=null
     private var subtitlesOff=false
     private var subtitleManual=false
@@ -81,6 +83,7 @@ class PlayerActivity:Activity(){
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
         item=Routes.read(this)
+        item.optJSONObject("meta")?.optString("name")?.takeIf{it.isNotBlank()}?.let{item.put("name",it)}
         if(item.optString("url").isEmpty())item.put("url",intent.getStringExtra("url").orEmpty()).put("type","direct")
         val url=item.optString("url")
         if(!validStream(url)&&!url.matches(Regex("torrent://[a-fA-F0-9]{40,64}/[0-9]+"))){finish();return}
@@ -124,7 +127,7 @@ class PlayerActivity:Activity(){
         information=TextView(this).apply{textSize=16f;setTextColor(Color.WHITE)};overlay.addView(information)
         timeline=PlaybackTimeline(this).apply{seek={seekAbsolute(it)}};overlay.addView(timeline,LinearLayout.LayoutParams(-1,dp(32)))
         val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-        fun control(label:String,action:()->Unit){val button=tvButton(row,label){lastInteraction=SystemClock.elapsedRealtime();action()};button.layoutParams=LinearLayout.LayoutParams(dp(140),dp(60)).apply{marginEnd=dp(8)}}
+        fun control(label:String,action:()->Unit){val button=tvButton(row,label){lastInteraction=SystemClock.elapsedRealtime();action()};button.textSize=18f;button.setPadding(dp(8),dp(4),dp(8),dp(4));button.layoutParams=LinearLayout.LayoutParams(dp(144),dp(60)).apply{marginEnd=dp(8)};if(label=="Play / Pause")playControl=button}
         control("− Seek"){seek(-settings.optInt("seekSeconds",10))};control("Play / Pause"){toggle()};control("Seek +"){seek(settings.optInt("seekSeconds",10))}
         control("Audio"){audioTracks()};control("Subtitles"){subtitleTracks()};control("Chapters"){chapters()};control("Details"){details()};control("A/V settings"){avSettings()};control("Close"){finish()}
         overlay.addView(HorizontalScrollView(this).apply{addView(row);isHorizontalScrollBarEnabled=false})
@@ -133,9 +136,9 @@ class PlayerActivity:Activity(){
         skip=tvButton(prompts,"Skip"){flow.active?.let{seekAbsolute((it.end*1000).toLong());flow.skipped()}}
         next=tvButton(prompts,"Next episode"){launchNext()}
         cancelNext=tvButton(prompts,"Cancel autoplay"){flow.cancel();nextItem=null}
-        listOf(skip,next,cancelNext).forEach{it.layoutParams=LinearLayout.LayoutParams(dp(210),dp(60)).apply{marginEnd=dp(8)};it.visibility=View.GONE}
+        listOf(skip,next,cancelNext).forEach{it.textSize=18f;it.setPadding(dp(8),dp(4),dp(8),dp(4));it.layoutParams=LinearLayout.LayoutParams(dp(210),dp(60)).apply{marginEnd=dp(8)};it.visibility=View.GONE}
         root.addView(prompts,FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM).apply{bottomMargin=dp(120)})
-        setContentView(root);root.requestFocus();lastInteraction=SystemClock.elapsedRealtime()
+        setContentView(root);playControl.requestFocus();lastInteraction=SystemClock.elapsedRealtime()
     }
     override fun onStart(){super.onStart();active=true;if(initialized){CoreBridge.workers.submit{runCatching{CoreBridge.request("app.foreground")}.onSuccess{main.post{if(active&&!isDestroyed){settings=JSONObject(CoreBridge.settings.toString());startEngine()}}}}}}
     private fun startEngine(){
@@ -247,7 +250,7 @@ class PlayerActivity:Activity(){
     private fun toggle(){exo?.let{it.playWhenReady=!it.playWhenReady};vlc?.let{if(it.isPlaying)it.pause()else it.play()};showControls()}
     private fun seek(seconds:Int)=seekAbsolute(position()+seconds*1000L)
     private fun seekAbsolute(value:Long){val target=if(duration()>0)value.coerceIn(0,duration()-1)else value.coerceAtLeast(0);ended=false;exo?.seekTo(target);vlc?.setTime(target);showControls()}
-    private fun showControls(){lastInteraction=SystemClock.elapsedRealtime();overlay.visibility=View.VISIBLE;title.visibility=View.VISIBLE}
+    private fun showControls(){lastInteraction=SystemClock.elapsedRealtime();overlay.visibility=View.VISIBLE;title.visibility=View.VISIBLE;if(overlay.findFocus()==null)playControl.requestFocus()}
     private fun update(){
         if(!active||isDestroyed)return
         val now=SystemClock.elapsedRealtime();val elapsed=((now-lastTick)/1000.0).coerceIn(0.0,1.0);lastTick=now
@@ -256,7 +259,7 @@ class PlayerActivity:Activity(){
             timeline.chapters=if(player!=null&&player.title>=0&&duration>0)player.getChapters(player.title).orEmpty().map{it.timeOffset to it.name.orEmpty()}.filter{it.first in 0 until duration}.distinctBy{it.first}.sortedBy{it.first}.takeIf{it.size>=2}.orEmpty()else emptyList()
         }
         timeline.position=position;timeline.duration=duration;timeline.seekStep=settings.optInt("seekSeconds",10)*1000L;timeline.invalidate()
-        information.text="${clock(position)} / ${if(duration>0)clock(duration)else "Live"} · ${if(exo!=null)"Media3" else "VLC"}${if(exo?.playbackState==Player.STATE_BUFFERING||vlcBuffer in 0f..98f)" · Buffering" else ""}"
+        information.text="${clock(position)} / ${if(duration>0)clock(duration)else "Live"} · ${if(exo!=null)"Media3" else "VLC"}${if(exo?.playbackState==Player.STATE_BUFFERING||(vlc!=null&&vlcBuffer in 0f..98f))" · Buffering" else ""}"
         timeline.chapters.lastOrNull{it.first<=position}?.second?.takeIf{it.isNotBlank()}?.let{information.append(" · $it")}
         if(now-lastInteraction>6000&&overlay.visibility==View.VISIBLE){overlay.visibility=View.GONE;title.visibility=View.GONE;root.requestFocus()}
         val episode=item.optString("type")=="series"
@@ -278,7 +281,7 @@ class PlayerActivity:Activity(){
         CoreBridge.workers.submit{
             try{
                 val next=CoreBridge.request("next",args)as?JSONObject?:return@submit
-                val request=JSONObject(args.toString()).put("videoId",next.optString("id")).put("refresh",true)
+                val request=JSONObject(args.toString()).put("videoId",next.optString("id")).put("season",next.optInt("season")).put("episode",next.optInt("episode")).put("refresh",true)
                 val streams=CoreBridge.objectResult("streams",request).optJSONArray("streams")?:return@submit
                 val match=CoreBridge.objectResult("streams.match",JSONObject().put("streams",streams).put("previous",item.optJSONObject("stream")?:JSONObject())).optInt("index",-1)
                 if(match<0)return@submit
@@ -287,10 +290,9 @@ class PlayerActivity:Activity(){
                 if(resolved.optString("url").isBlank()){
                     val hash=resolved.optString("info_hash")
                     if(hash.isBlank()||!settings.optBoolean("torrents"))return@submit
-                    val torrent=CoreBridge.objectResult("torrents.start",JSONObject().put("input",hash).put("sources",stream.optJSONArray("sources")).put("season",next.optInt("season")).put("episode",next.optInt("episode")))
-                    val index=stream.optInt("file_index",torrent.optInt("suggested",-1))
-                    if(index<0)return@submit
-                    resolved.put("url","torrent://$hash/$index").put("torrentHash",hash).put("torrentIndex",index)
+                    // The shared torrent engine owns one active torrent. Start
+                    // the next swarm only after releasing this episode's reader.
+                    resolved.put("deferredTorrent",hash)
                 }
                 val playback=JSONObject(item.toString()).put("videoId",next.optString("id")).put("season",next.optInt("season")).put("episode",next.optInt("episode")).put("stream",stream).put("resume",0)
                 resolved.keys().forEach{playback.put(it,resolved.get(it))}
@@ -300,7 +302,14 @@ class PlayerActivity:Activity(){
         }
     }
     private fun launchNext(){val value=nextItem?:return;if(item.optString("profileKey")!=CoreBridge.profileKey)return
-        nextItem=null;flow.cancel();saveProgress(position(),duration(),true);Routes.open(this,PlayerActivity::class.java,value);finish()}
+        nextItem=null;flow.cancel();transitioning=true;positionMs=position();saveProgress(positionMs,duration(),true)
+        val torrent=value.optString("deferredTorrent")
+        if(torrent.isNotBlank()){
+            active=false;main.removeCallbacks(tick);releaseEngine()
+            Routes.open(this,TorrentsActivity::class.java,JSONObject().put("input",torrent).put("playback",value).put("auto",true))
+        }else Routes.open(this,PlayerActivity::class.java,value)
+        finish()
+    }
     private fun saveProgress(position:Long,duration:Long,finished:Boolean=false){
         val type=item.optString("type");if(type in listOf("trailer","tv","media-server"))return
         val completed=finished||(duration>0&&position>=duration*0.95)
@@ -393,14 +402,17 @@ class PlayerActivity:Activity(){
         if(event.action!=KeyEvent.ACTION_DOWN)return super.dispatchKeyEvent(event)
         val mapped=settings.optJSONObject("remoteMappings")?.optString(event.keyCode.toString()).orEmpty()
         val action=if(mapped.isNotBlank())mapped else when(event.keyCode){
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,KeyEvent.KEYCODE_BUTTON_A->"playPause"
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE->"playPause"
+            KeyEvent.KEYCODE_MEDIA_PLAY->"play";KeyEvent.KEYCODE_MEDIA_PAUSE->"pause"
+            KeyEvent.KEYCODE_BUTTON_A->if(overlay.visibility!=View.VISIBLE||timeline.hasFocus())"playPause"else ""
             KeyEvent.KEYCODE_MEDIA_REWIND->"seekBack";KeyEvent.KEYCODE_MEDIA_FAST_FORWARD->"seekForward"
             KeyEvent.KEYCODE_BUTTON_L1,KeyEvent.KEYCODE_PAGE_UP->"longBack";KeyEvent.KEYCODE_BUTTON_R1,KeyEvent.KEYCODE_PAGE_DOWN->"longForward"
             KeyEvent.KEYCODE_MENU,KeyEvent.KEYCODE_BUTTON_Y->"details";KeyEvent.KEYCODE_CAPTIONS->"subtitles"
-            KeyEvent.KEYCODE_BACK->"back";else->""
+            KeyEvent.KEYCODE_BACK,KeyEvent.KEYCODE_BUTTON_B->"back";else->""
         }
         when(action){
             "playPause"->{if(event.repeatCount==0)toggle();return true}
+            "play"->{exo?.play();vlc?.play();showControls();return true};"pause"->{exo?.pause();vlc?.pause();showControls();return true}
             "seekBack"->{seek(-settings.optInt("seekSeconds",10));return true};"seekForward"->{seek(settings.optInt("seekSeconds",10));return true}
             "longBack"->{seek(-settings.optInt("longSeekSeconds",60));return true};"longForward"->{seek(settings.optInt("longSeekSeconds",60));return true}
             "audio"->{if(event.repeatCount==0)audioTracks();return true};"subtitles"->{if(event.repeatCount==0)subtitleTracks();return true};"details"->{if(event.repeatCount==0)details();return true}
@@ -429,7 +441,7 @@ class PlayerActivity:Activity(){
     override fun onStop(){
         if(!::video.isInitialized){super.onStop();return}
         val position=position();val duration=duration();playWhenReady=exo?.playWhenReady?:vlc?.isPlaying?:playWhenReady;positionMs=position
-        active=false;main.removeCallbacks(tick);saveProgress(position,duration,ended);serverReport("stop");releaseEngine()
+        active=false;main.removeCallbacks(tick);if(!transitioning)saveProgress(position,duration,ended);serverReport("stop");releaseEngine()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);super.onStop()
     }
 }

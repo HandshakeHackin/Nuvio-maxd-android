@@ -38,6 +38,7 @@ jobs:
             -DCMAKE_MAKE_PROGRAM="$ANDROID_HOME/cmake/3.22.1/bin/ninja" -DCMAKE_BUILD_TYPE=Release
           "$ANDROID_HOME/cmake/3.22.1/bin/cmake" --build build/host-core --parallel 2
           python3 tools/test_android_bridge.py
+          python3 tools/test_android_account_boundary.py
       - run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
       - uses: actions/upload-artifact@v4
         with:

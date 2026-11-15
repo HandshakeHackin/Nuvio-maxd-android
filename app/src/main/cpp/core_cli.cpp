@@ -14,7 +14,7 @@ int main() {
             const auto request=json::parse(line);
             if(jstr(request,"command")=="test.torrent.read") {
                 const auto args=jobj(request,"arguments");
-                auto reader=nuvio_android::open_torrent(jstr(args,"hash"),int(jnum(args,"index")));
+                auto reader=nuvio_android::open_torrent(jstr(args,"hash"),int(jnum(args,"index")),jstr(args,"profileKey"));
                 std::vector<uint8_t> data(size_t(std::clamp(jnum(args,"length",1024),1.0,1048576.0)));
                 const auto count=nuvio_android::read_torrent(reader,int64_t(jnum(args,"offset")),data.data(),int(data.size()));
                 std::string hex;static const char digits[]="0123456789abcdef";

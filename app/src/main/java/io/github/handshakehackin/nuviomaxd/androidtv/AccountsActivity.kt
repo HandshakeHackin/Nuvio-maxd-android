@@ -11,11 +11,12 @@ class AccountsActivity:TvActivity(){
             text("Sign in with your phone to load your Nuvio account, profiles, addons and watch progress.")
             button("Link this Android TV"){work("account.pair"){value->val code=obj(value)
                 pair("Nuvio sign-in",code.optString("url"),code.optString("displayCode"),code.optInt("interval",3),code.optInt("expires",600),
-                    "account.poll",JSONObject().put("code",code.optString("code")),"account.cancel"){render()}
+                    "account.poll",JSONObject().put("code",code.optString("code")),"account.cancel"){work("settings"){render()}}
             }}
             button("Continue as Guest"){finish()};return
         }
         button("Refresh profiles"){render()}
+        if(CoreBridge.context.optBoolean("pending"))text("Your login is saved. Reconnect and refresh profiles to verify the account before using its saved settings and services.")
         button("Create a profile"){form("Create Nuvio profile",listOf("Profile name" to false)){values->work("profiles.create",JSONObject().put("name",values[0])){render()}}}
         button("Sign out"){confirm("Sign out on this Android TV?"){work("account.logout"){work("settings"){finish()}}}}
         work("profiles"){value->val result=obj(value);text(result.optString("userEmail"))
